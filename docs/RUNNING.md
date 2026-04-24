@@ -1,10 +1,10 @@
 # Running Locally
 
-## Part 2 scaffold
+## Part 3 integrated app
 
-The current scaffold runs as a single Docker container and serves:
+The current app runs as a single Docker container and serves:
 
-- Temporary HTML at `http://localhost:8000/`
+- The statically exported Next.js Kanban app at `http://localhost:8000/`
 - Example JSON API at `http://localhost:8000/api/hello`
 - Health endpoint at `http://localhost:8000/api/health`
 
@@ -29,4 +29,27 @@ macOS and Linux:
 ```bash
 docker build -t pm-mvp .
 docker run --rm -p 8000:8000 --name pm-mvp pm-mvp
+```
+
+## Local test flow
+
+Frontend unit tests:
+
+```bash
+cd frontend
+npm run test:unit
+```
+
+Backend tests:
+
+```bash
+cd backend
+uv run pytest
+```
+
+Integrated end-to-end tests:
+
+```bash
+cd frontend
+npm run test:e2e
 ```

@@ -2,9 +2,9 @@
 
 This folder contains helper scripts for running and stopping the local Docker-based app.
 
-Current scope in Part 2:
+Current scope in Part 3:
 - Build the single application image.
-- Start the container locally on port 8000.
+- Start the container locally on port 8000 with the exported frontend served by FastAPI.
 - Stop and remove the local container cleanly.
 
 Working guidance:

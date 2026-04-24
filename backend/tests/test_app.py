@@ -5,22 +5,61 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.main import app
+from app.main import create_app
 
 
-client = TestClient(app)
+def write_frontend_dist(dist_dir: Path) -> Path:
+  dist_dir.mkdir(parents=True)
+  (dist_dir / "index.html").write_text(
+    """
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <title>Kanban Studio</title>
+        <script src="/_next/static/chunks/app.js" defer></script>
+      </head>
+      <body>
+        <h1>Kanban Studio</h1>
+      </body>
+    </html>
+    """.strip(),
+    encoding="utf-8",
+  )
+  asset_dir = dist_dir / "_next" / "static" / "chunks"
+  asset_dir.mkdir(parents=True)
+  (asset_dir / "app.js").write_text("console.log('frontend asset');", encoding="utf-8")
+  return dist_dir
 
 
-def test_root_serves_html_scaffold() -> None:
+def test_root_serves_exported_frontend(tmp_path: Path) -> None:
+  client = TestClient(create_app(write_frontend_dist(tmp_path / "out")))
   response = client.get("/")
 
   assert response.status_code == 200
   assert response.headers["content-type"].startswith("text/html")
-  assert "Hello from the Project Management MVP" in response.text
-  assert 'fetch("/api/hello")' in response.text
+  assert "Kanban Studio" in response.text
+  assert "/_next/static/chunks/app.js" in response.text
+
+
+def test_frontend_static_assets_are_served(tmp_path: Path) -> None:
+  client = TestClient(create_app(write_frontend_dist(tmp_path / "out")))
+  response = client.get("/_next/static/chunks/app.js")
+
+  assert response.status_code == 200
+  assert response.text == "console.log('frontend asset');"
+
+
+def test_missing_frontend_build_returns_clear_error(tmp_path: Path) -> None:
+  client = TestClient(create_app(tmp_path / "missing"))
+  response = client.get("/")
+
+  assert response.status_code == 503
+  assert "Frontend build not found" in response.text
 
 
 def test_health_route_reports_ok() -> None:
+  client = TestClient(create_app())
   response = client.get("/api/health")
 
   assert response.status_code == 200
@@ -28,6 +67,7 @@ def test_health_route_reports_ok() -> None:
 
 
 def test_hello_route_returns_example_message() -> None:
+  client = TestClient(create_app())
   response = client.get("/api/hello")
 
   assert response.status_code == 200

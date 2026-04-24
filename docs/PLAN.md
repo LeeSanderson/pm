@@ -83,23 +83,28 @@ Status:
 Goal: replace the temporary HTML with the statically built existing Next.js frontend, still served by FastAPI from the same container.
 
 Checklist:
-- [ ] Decide the frontend build output approach that works cleanly with FastAPI static serving.
-- [ ] Wire the Docker build so the frontend is built and copied into the final image.
-- [ ] Update FastAPI to serve the exported frontend assets at `/`.
-- [ ] Preserve the existing visual design and interactions from the frontend demo.
-- [ ] Keep the frontend running entirely client-side and in-memory for this part.
-- [ ] Document the new build and run flow.
+- [x] Decide the frontend build output approach that works cleanly with FastAPI static serving.
+- [x] Wire the Docker build so the frontend is built and copied into the final image.
+- [x] Update FastAPI to serve the exported frontend assets at `/`.
+- [x] Preserve the existing visual design and interactions from the frontend demo.
+- [x] Keep the frontend running entirely client-side and in-memory for this part.
+- [x] Document the new build and run flow.
 
 Tests:
-- [ ] Frontend unit tests pass.
-- [ ] Frontend build succeeds.
-- [ ] Playwright tests verify the board loads inside the integrated app.
-- [ ] Integration test confirms FastAPI serves the built frontend asset entrypoint.
+- [x] Frontend unit tests pass.
+- [x] Frontend build succeeds.
+- [x] Playwright tests verify the board loads inside the integrated app.
+- [x] Integration test confirms FastAPI serves the built frontend asset entrypoint.
 
 Success criteria:
 - `/` shows the current Kanban demo instead of placeholder HTML.
 - The single container serves both frontend assets and backend routes.
 - Existing board interactions still work after integration.
+
+Status:
+- Completed on 2026-04-24.
+- FastAPI now serves the statically exported Next.js Kanban app at `/`.
+- Backend tests, frontend unit tests, integrated Playwright tests, and Docker smoke validation all passed.
 
 ## Part 4: Fake User Sign-In
 
