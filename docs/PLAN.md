@@ -166,24 +166,29 @@ Status:
 Goal: add the backend persistence and API routes for reading and mutating a user's board.
 
 Checklist:
-- [ ] Implement SQLite connection and startup initialization.
-- [ ] Create the database automatically if it does not exist.
-- [ ] Seed a default board for a user when needed.
-- [ ] Add authenticated API routes to fetch the current board.
-- [ ] Add authenticated API routes to rename columns and create, delete, edit, and move cards.
-- [ ] Validate request payloads with clear error responses.
-- [ ] Keep API shapes aligned with the frontend board model where practical.
-- [ ] Document the board API endpoints.
+- [x] Implement SQLite connection and startup initialization.
+- [x] Create the database automatically if it does not exist.
+- [x] Seed a default board for a user when needed.
+- [x] Add authenticated API routes to fetch the current board.
+- [x] Add authenticated API routes to rename columns and create, delete, edit, and move cards.
+- [x] Validate request payloads with clear error responses.
+- [x] Keep API shapes aligned with the frontend board model where practical.
+- [x] Document the board API endpoints.
 
 Tests:
-- [ ] Backend unit tests for database helpers and route validation.
-- [ ] Backend integration tests for board fetch, mutation flows, and auto-creation behavior.
-- [ ] Authenticated API tests covering unauthorized access.
+- [x] Backend unit tests for database helpers and route validation.
+- [x] Backend integration tests for board fetch, mutation flows, and auto-creation behavior.
+- [x] Authenticated API tests covering unauthorized access.
 
 Success criteria:
 - The backend can fully reconstruct and persist a user's board.
 - Board changes survive app restarts.
 - API failures are deterministic and readable.
+
+Status:
+- Completed on 2026-04-24.
+- SQLite board persistence and authenticated board mutation routes are implemented.
+- Backend tests cover auto-creation, persistence, validation, and core mutation flows.
 
 ## Part 7: Frontend + Backend
 

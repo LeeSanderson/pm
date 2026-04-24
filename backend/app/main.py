@@ -8,7 +8,15 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.board_store import (
+  BoardStore,
+  BoardValidationError,
+  CardNotFoundError,
+  ColumnNotFoundError,
+)
+
 DEFAULT_FRONTEND_DIST_DIR = Path(__file__).resolve().parents[2] / "frontend" / "out"
+DEFAULT_DB_PATH = Path(__file__).resolve().parents[2] / "db.sqlite3"
 AUTH_USERNAME = "user"
 AUTH_PASSWORD = "password"
 SESSION_COOKIE_NAME = "pm_session"
@@ -19,6 +27,25 @@ DEFAULT_SESSION_SECRET = "pm-mvp-dev-session-secret"
 class LoginRequest(BaseModel):
   username: str
   password: str
+
+
+class RenameColumnRequest(BaseModel):
+  title: str
+
+
+class CreateCardRequest(BaseModel):
+  title: str
+  details: str = ""
+
+
+class UpdateCardRequest(BaseModel):
+  title: str
+  details: str
+
+
+class MoveCardRequest(BaseModel):
+  column_id: str
+  position: int
 
 
 def resolve_frontend_dist_dir(frontend_dist_dir: Path | None = None) -> Path:
@@ -36,6 +63,17 @@ def resolve_session_secret() -> str:
   return os.environ.get("SESSION_SECRET", DEFAULT_SESSION_SECRET)
 
 
+def resolve_db_path(db_path: Path | None = None) -> Path:
+  if db_path is not None:
+    return db_path
+
+  configured_path = os.environ.get("DB_PATH")
+  if configured_path:
+    return Path(configured_path)
+
+  return DEFAULT_DB_PATH
+
+
 def get_authenticated_username(request: Request) -> str | None:
   username = request.session.get("username")
   if username == AUTH_USERNAME:
@@ -43,8 +81,20 @@ def get_authenticated_username(request: Request) -> str | None:
   return None
 
 
-def create_app(frontend_dist_dir: Path | None = None) -> FastAPI:
+def require_authenticated_username(request: Request) -> str:
+  username = get_authenticated_username(request)
+  if username is None:
+    raise HTTPException(
+      status_code=status.HTTP_401_UNAUTHORIZED,
+      detail="Not authenticated",
+    )
+  return username
+
+
+def create_app(frontend_dist_dir: Path | None = None, db_path: Path | None = None) -> FastAPI:
   app = FastAPI(title="Project Management MVP Backend")
+  board_store = BoardStore(resolve_db_path(db_path))
+  board_store.initialize()
   app.add_middleware(
     SessionMiddleware,
     secret_key=resolve_session_secret(),
@@ -55,13 +105,7 @@ def create_app(frontend_dist_dir: Path | None = None) -> FastAPI:
 
   @app.get("/api/auth/session")
   def read_session(request: Request) -> dict[str, str]:
-    username = get_authenticated_username(request)
-    if username is None:
-      raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Not authenticated",
-      )
-    return {"username": username}
+    return {"username": require_authenticated_username(request)}
 
   @app.post("/api/auth/login")
   def login(payload: LoginRequest, request: Request) -> dict[str, str]:
@@ -81,6 +125,84 @@ def create_app(frontend_dist_dir: Path | None = None) -> FastAPI:
   def logout(request: Request) -> Response:
     request.session.clear()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+  @app.get("/api/board")
+  def read_board(request: Request) -> dict[str, object]:
+    username = require_authenticated_username(request)
+    return board_store.get_board(username)
+
+  @app.patch("/api/board/columns/{column_id}")
+  def rename_column(
+    column_id: str,
+    payload: RenameColumnRequest,
+    request: Request,
+  ) -> dict[str, object]:
+    username = require_authenticated_username(request)
+    try:
+      return board_store.rename_column(username, column_id, payload.title)
+    except ColumnNotFoundError as error:
+      raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except BoardValidationError as error:
+      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+  @app.post("/api/board/columns/{column_id}/cards")
+  def create_card(
+    column_id: str,
+    payload: CreateCardRequest,
+    request: Request,
+  ) -> dict[str, object]:
+    username = require_authenticated_username(request)
+    try:
+      return board_store.add_card(username, column_id, payload.title, payload.details)
+    except ColumnNotFoundError as error:
+      raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except BoardValidationError as error:
+      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+  @app.patch("/api/board/cards/{card_id}")
+  def update_card(
+    card_id: str,
+    payload: UpdateCardRequest,
+    request: Request,
+  ) -> dict[str, object]:
+    username = require_authenticated_username(request)
+    try:
+      return board_store.update_card(username, card_id, payload.title, payload.details)
+    except CardNotFoundError as error:
+      raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except BoardValidationError as error:
+      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+
+  @app.delete("/api/board/columns/{column_id}/cards/{card_id}")
+  def delete_card(
+    column_id: str,
+    card_id: str,
+    request: Request,
+  ) -> dict[str, object]:
+    username = require_authenticated_username(request)
+    try:
+      return board_store.delete_card(username, column_id, card_id)
+    except CardNotFoundError as error:
+      raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+
+  @app.patch("/api/board/cards/{card_id}/move")
+  def move_card(
+    card_id: str,
+    payload: MoveCardRequest,
+    request: Request,
+  ) -> dict[str, object]:
+    username = require_authenticated_username(request)
+    try:
+      return board_store.move_card(
+        username,
+        card_id,
+        payload.column_id,
+        payload.position,
+      )
+    except (ColumnNotFoundError, CardNotFoundError) as error:
+      raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+    except BoardValidationError as error:
+      raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
 
   @app.get("/api/health")
   def read_health() -> dict[str, str]:
