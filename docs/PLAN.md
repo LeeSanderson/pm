@@ -222,23 +222,28 @@ Status:
 Goal: add a backend integration with OpenRouter and prove the external call works.
 
 Checklist:
-- [ ] Add backend configuration for `OPENROUTER_API_KEY` and the fixed model string.
-- [ ] Fail clearly when AI routes are used without the API key.
-- [ ] Create a small backend AI client abstraction so unit tests can mock it.
-- [ ] Add a simple backend route or service path that asks the model a basic prompt such as `2+2`.
-- [ ] Add a dummy implementation path for non-live integration tests.
-- [ ] Add one opt-in live integration test for the real OpenRouter path.
+- [x] Add backend configuration for `OPENROUTER_API_KEY` and the fixed model string.
+- [x] Fail clearly when AI routes are used without the API key.
+- [x] Create a small backend AI client abstraction so unit tests can mock it.
+- [x] Add a simple backend route or service path that asks the model a basic prompt such as `2+2`.
+- [x] Add a dummy implementation path for non-live integration tests.
+- [x] Add one opt-in live integration test for the real OpenRouter path.
 
 Tests:
-- [ ] Backend unit tests for AI client configuration and error handling.
-- [ ] Backend unit tests with mocked OpenRouter responses.
-- [ ] Integration test using a dummy AI implementation.
-- [ ] Opt-in live integration test against OpenRouter when credentials are available.
+- [x] Backend unit tests for AI client configuration and error handling.
+- [x] Backend unit tests with mocked OpenRouter responses.
+- [x] Integration test using a dummy AI implementation.
+- [x] Opt-in live integration test against OpenRouter when credentials are available.
 
 Success criteria:
 - The backend can successfully call OpenRouter using the configured model.
 - Missing API key errors are explicit and covered by tests.
 - Live AI verification exists without destabilizing the default local test suite.
+
+Status:
+- Completed on 2026-04-24.
+- The backend now exposes an authenticated AI probe route backed by an OpenRouter client with a dummy test path.
+- Default backend tests pass locally, and the real OpenRouter verification is available through an opt-in live test.
 
 ## Part 9: AI Board-Aware Structured Outputs
 

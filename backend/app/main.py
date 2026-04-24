@@ -8,6 +8,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.ai_client import (
+  OPENROUTER_PROBE_PROMPT,
+  AIClient,
+  AIConfigurationError,
+  AIResponseError,
+  resolve_ai_client,
+)
+
 from app.board_store import (
   BoardStore,
   BoardValidationError,
@@ -95,7 +103,11 @@ def require_authenticated_username(request: Request) -> str:
   return username
 
 
-def create_app(frontend_dist_dir: Path | None = None, db_path: Path | None = None) -> FastAPI:
+def create_app(
+  frontend_dist_dir: Path | None = None,
+  db_path: Path | None = None,
+  ai_client: AIClient | None = None,
+) -> FastAPI:
   app = FastAPI(title="Project Management MVP Backend")
   board_store = BoardStore(resolve_db_path(db_path))
   board_store.initialize()
@@ -134,6 +146,24 @@ def create_app(frontend_dist_dir: Path | None = None, db_path: Path | None = Non
   def read_board(request: Request) -> dict[str, object]:
     username = require_authenticated_username(request)
     return board_store.get_board(username)
+
+  @app.post("/api/ai/probe")
+  def probe_ai(request: Request) -> dict[str, str]:
+    require_authenticated_username(request)
+
+    try:
+      active_ai_client = ai_client or resolve_ai_client()
+      reply = active_ai_client.generate_text(OPENROUTER_PROBE_PROMPT)
+    except AIConfigurationError as error:
+      raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+    except AIResponseError as error:
+      raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
+
+    return {
+      "model": active_ai_client.model,
+      "prompt": OPENROUTER_PROBE_PROMPT,
+      "reply": reply,
+    }
 
   if is_test_api_enabled():
     @app.post("/api/test/reset-board", include_in_schema=False)

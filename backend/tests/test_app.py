@@ -5,7 +5,15 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from app.ai_client import DummyAIClient, AIResponseError, OPENROUTER_MODEL
 from app.main import create_app
+
+
+class FailingAIClient:
+  model = OPENROUTER_MODEL
+
+  def generate_text(self, prompt: str) -> str:
+    raise AIResponseError("OpenRouter request failed")
 
 
 def write_frontend_dist(dist_dir: Path) -> Path:
@@ -32,15 +40,20 @@ def write_frontend_dist(dist_dir: Path) -> Path:
   return dist_dir
 
 
-def create_client(tmp_path: Path, db_path: Path | None = None) -> TestClient:
-  return TestClient(create_app(tmp_path / "missing", db_path=db_path))
+def create_client(
+  tmp_path: Path,
+  db_path: Path | None = None,
+  ai_client: DummyAIClient | FailingAIClient | None = None,
+) -> TestClient:
+  return TestClient(create_app(tmp_path / "missing", db_path=db_path, ai_client=ai_client))
 
 
 def create_authenticated_client(
   tmp_path: Path,
   db_path: Path | None = None,
+  ai_client: DummyAIClient | FailingAIClient | None = None,
 ) -> TestClient:
-  client = create_client(tmp_path, db_path)
+  client = create_client(tmp_path, db_path, ai_client)
   response = client.post(
     "/api/auth/login",
     json={"username": "user", "password": "password"},
@@ -166,6 +179,56 @@ def test_board_route_requires_login(tmp_path: Path) -> None:
 
   assert response.status_code == 401
   assert response.json() == {"detail": "Not authenticated"}
+
+
+def test_ai_probe_requires_login(tmp_path: Path) -> None:
+  client = create_client(tmp_path)
+
+  response = client.post("/api/ai/probe")
+
+  assert response.status_code == 401
+  assert response.json() == {"detail": "Not authenticated"}
+
+
+def test_ai_probe_returns_dummy_response(tmp_path: Path) -> None:
+  client = create_authenticated_client(
+    tmp_path,
+    tmp_path / "db.sqlite3",
+    ai_client=DummyAIClient("4"),
+  )
+
+  response = client.post("/api/ai/probe")
+
+  assert response.status_code == 200
+  assert response.json() == {
+    "model": "dummy/openrouter-probe",
+    "prompt": "What is 2+2? Reply with digits only.",
+    "reply": "4",
+  }
+
+
+def test_ai_probe_requires_configured_api_key(tmp_path: Path, monkeypatch) -> None:
+  monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+  monkeypatch.delenv("OPENROUTER_USE_DUMMY", raising=False)
+  client = create_authenticated_client(tmp_path, tmp_path / "db.sqlite3")
+
+  response = client.post("/api/ai/probe")
+
+  assert response.status_code == 503
+  assert response.json() == {"detail": "OPENROUTER_API_KEY is not set"}
+
+
+def test_ai_probe_maps_upstream_failures_to_bad_gateway(tmp_path: Path) -> None:
+  client = create_authenticated_client(
+    tmp_path,
+    tmp_path / "db.sqlite3",
+    ai_client=FailingAIClient(),
+  )
+
+  response = client.post("/api/ai/probe")
+
+  assert response.status_code == 502
+  assert response.json() == {"detail": "OpenRouter request failed"}
 
 
 def test_board_fetch_creates_database_and_returns_seed_data(tmp_path: Path) -> None:
