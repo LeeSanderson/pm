@@ -138,11 +138,11 @@ Status:
 Goal: propose and document the SQLite persistence model for the Kanban board before implementing it.
 
 Checklist:
-- [ ] Review the current frontend board shape and upcoming backend requirements.
-- [ ] Compare at least two viable SQLite storage approaches, including a JSON-based approach.
-- [ ] Recommend one schema for the MVP with reasoning focused on simplicity and future multi-user support.
-- [ ] Define how board reads, writes, initialization, and migrations will work.
-- [ ] Document the proposal in `docs/`.
+- [x] Review the current frontend board shape and upcoming backend requirements.
+- [x] Compare at least two viable SQLite storage approaches, including a JSON-based approach.
+- [x] Recommend one schema for the MVP with reasoning focused on simplicity and future multi-user support.
+- [x] Define how board reads, writes, initialization, and migrations will work.
+- [x] Document the proposal in `docs/`.
 - [ ] Ask the user to approve the schema before implementation begins.
 
 Tests:
@@ -155,6 +155,11 @@ Success criteria:
 
 Approval gate:
 - Required before Part 6.
+
+Status:
+- Proposal prepared on 2026-04-24.
+- Recommended schema is documented in `docs/DATABASE.md`.
+- Waiting for user approval before Part 6.
 
 ## Part 6: Backend
 
