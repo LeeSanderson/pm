@@ -74,6 +74,10 @@ def resolve_db_path(db_path: Path | None = None) -> Path:
   return DEFAULT_DB_PATH
 
 
+def is_test_api_enabled() -> bool:
+  return os.environ.get("ENABLE_TEST_API") == "1"
+
+
 def get_authenticated_username(request: Request) -> str | None:
   username = request.session.get("username")
   if username == AUTH_USERNAME:
@@ -130,6 +134,11 @@ def create_app(frontend_dist_dir: Path | None = None, db_path: Path | None = Non
   def read_board(request: Request) -> dict[str, object]:
     username = require_authenticated_username(request)
     return board_store.get_board(username)
+
+  if is_test_api_enabled():
+    @app.post("/api/test/reset-board", include_in_schema=False)
+    def reset_board() -> dict[str, object]:
+      return board_store.reset_board(AUTH_USERNAME)
 
   @app.patch("/api/board/columns/{column_id}")
   def rename_column(

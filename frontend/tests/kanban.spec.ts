@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+const resetBoard = async (page: import("@playwright/test").Page) => {
+  const response = await page.request.post("/api/test/reset-board");
+  expect(response.ok()).toBeTruthy();
+};
+
 const login = async (page: import("@playwright/test").Page) => {
   await page.goto("/");
   await expect(
@@ -10,6 +15,10 @@ const login = async (page: import("@playwright/test").Page) => {
   await page.getByRole("button", { name: /^sign in$/i }).click();
   await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();
 };
+
+test.beforeEach(async ({ page }) => {
+  await resetBoard(page);
+});
 
 test("requires login before showing the board", async ({ page }) => {
   await page.goto("/");
@@ -47,6 +56,10 @@ test("adds a card to a column", async ({ page }) => {
   await firstColumn.getByPlaceholder("Details").fill("Added via e2e.");
   await firstColumn.getByRole("button", { name: /add card/i }).click();
   await expect(firstColumn.getByText("Playwright card")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();
+  await expect(firstColumn.getByText("Playwright card")).toBeVisible();
 });
 
 test("moves a card between columns", async ({ page }) => {
@@ -70,6 +83,10 @@ test("moves a card between columns", async ({ page }) => {
     { steps: 12 }
   );
   await page.mouse.up();
+  await expect(targetColumn.getByTestId("card-card-1")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();
   await expect(targetColumn.getByTestId("card-card-1")).toBeVisible();
 });
 

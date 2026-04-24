@@ -195,22 +195,27 @@ Status:
 Goal: move the Kanban UI from local in-memory state to the backend API.
 
 Checklist:
-- [ ] Replace local-only board initialization with backend fetch on load.
-- [ ] Replace direct local mutations with API-backed actions.
-- [ ] Add loading, saving, and error states that stay visually simple.
-- [ ] Keep drag-and-drop responsive while ensuring persisted ordering is correct.
-- [ ] Preserve the existing styling direction while introducing the live data flow.
-- [ ] Decide whether optimistic updates are necessary; prefer the simplest approach that feels correct.
+- [x] Replace local-only board initialization with backend fetch on load.
+- [x] Replace direct local mutations with API-backed actions.
+- [x] Add loading, saving, and error states that stay visually simple.
+- [x] Keep drag-and-drop responsive while ensuring persisted ordering is correct.
+- [x] Preserve the existing styling direction while introducing the live data flow.
+- [x] Decide whether optimistic updates are necessary; prefer the simplest approach that feels correct.
 
 Tests:
-- [ ] Frontend unit tests for API-backed board state flows.
-- [ ] Backend integration tests for the routes used by the UI.
-- [ ] Playwright end-to-end tests for login plus persistent board interactions.
+- [x] Frontend unit tests for API-backed board state flows.
+- [x] Backend integration tests for the routes used by the UI.
+- [x] Playwright end-to-end tests for login plus persistent board interactions.
 
 Success criteria:
 - Reloading the page shows the persisted board from SQLite.
 - Board mutations from the UI are reflected in the database.
 - The UI remains usable and visually consistent during network-backed interactions.
+
+Status:
+- Completed on 2026-04-24.
+- The frontend now loads the board from the backend and persists rename, add, delete, and move operations through the API.
+- Unit, backend integration, and integrated Playwright tests cover the live board flow and persistence across reloads.
 
 ## Part 8: AI Connectivity
 

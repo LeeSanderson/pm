@@ -268,6 +268,25 @@ class BoardStore:
     finally:
       connection.close()
 
+  def reset_board(self, username: str) -> dict[str, object]:
+    connection = self._connect()
+    try:
+      user_row = connection.execute(
+        "SELECT id FROM users WHERE username = ?",
+        (username,),
+      ).fetchone()
+      if user_row is not None:
+        connection.execute(
+          "DELETE FROM boards WHERE user_id = ?",
+          (user_row["id"],),
+        )
+
+      board_id = self._ensure_board(connection, username)
+      connection.commit()
+      return self._load_board(connection, board_id)
+    finally:
+      connection.close()
+
   def _connect(self) -> sqlite3.Connection:
     connection = sqlite3.connect(self.db_path)
     connection.row_factory = sqlite3.Row

@@ -303,3 +303,28 @@ def test_update_card_requires_non_empty_title(tmp_path: Path) -> None:
 
   assert response.status_code == 400
   assert response.json() == {"detail": "Card title is required"}
+
+
+def test_test_reset_board_route_is_disabled_by_default(tmp_path: Path) -> None:
+  client = create_client(tmp_path, tmp_path / "db.sqlite3")
+
+  response = client.post("/api/test/reset-board")
+
+  assert response.status_code == 404
+
+
+def test_test_reset_board_route_restores_seed_data_when_enabled(tmp_path: Path, monkeypatch) -> None:
+  db_path = tmp_path / "data" / "db.sqlite3"
+  monkeypatch.setenv("ENABLE_TEST_API", "1")
+  client = create_authenticated_client(tmp_path, db_path)
+
+  renamed = client.patch(
+    "/api/board/columns/col-backlog",
+    json={"title": "Ideas"},
+  )
+  assert renamed.status_code == 200
+  assert renamed.json()["columns"][0]["title"] == "Ideas"
+
+  reset = client.post("/api/test/reset-board")
+  assert reset.status_code == 200
+  assert reset.json()["columns"][0]["title"] == "Backlog"

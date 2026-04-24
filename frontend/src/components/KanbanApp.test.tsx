@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { KanbanApp } from "@/components/KanbanApp";
+import { initialData } from "@/lib/kanban";
 
 const jsonResponse = (body: unknown, status = 200) =>
   ({
@@ -37,7 +38,8 @@ describe("KanbanApp", () => {
   it("signs in successfully and renders the board", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ detail: "Not authenticated" }, 401))
-      .mockResolvedValueOnce(jsonResponse({ username: "user" }));
+      .mockResolvedValueOnce(jsonResponse({ username: "user" }))
+      .mockResolvedValueOnce(jsonResponse(initialData));
 
     render(<KanbanApp />);
 
@@ -71,6 +73,7 @@ describe("KanbanApp", () => {
   it("logs out and returns to the login screen", async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ username: "user" }))
+      .mockResolvedValueOnce(jsonResponse(initialData))
       .mockResolvedValueOnce({ ok: true, status: 204, json: async () => ({}) } as Response);
 
     render(<KanbanApp />);

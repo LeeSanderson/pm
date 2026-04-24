@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -8,7 +8,12 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendDir = path.resolve(scriptDir, "..");
 const backendDir = path.resolve(frontendDir, "..", "backend");
 const frontendDistDir = path.join(frontendDir, "out");
+const e2eDataDir = path.join(frontendDir, ".playwright");
+const e2eDbPath = path.join(e2eDataDir, "e2e.sqlite3");
 const port = process.env.PM_E2E_PORT ?? "4100";
+
+mkdirSync(e2eDataDir, { recursive: true });
+rmSync(e2eDbPath, { force: true });
 
 const syncResult = spawnSync("uv", ["sync", "--dev"], {
   cwd: backendDir,
@@ -36,11 +41,15 @@ const server = spawn(
     cwd: backendDir,
     env: {
       ...process.env,
+      DB_PATH: e2eDbPath,
+      ENABLE_TEST_API: "1",
       FRONTEND_DIST_DIR: frontendDistDir,
     },
     stdio: "inherit",
   }
 );
+
+console.log(`Using e2e database at ${e2eDbPath}`);
 
 const stopServer = (signal) => {
   if (!server.killed) {

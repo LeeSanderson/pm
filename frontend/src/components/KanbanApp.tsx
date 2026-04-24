@@ -130,6 +130,12 @@ export const KanbanApp = () => {
     }
   };
 
+  const handleSessionExpired = () => {
+    setUsername(null);
+    setAuthStatus("unauthenticated");
+    setErrorMessage(null);
+  };
+
   if (authStatus === "loading") {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[var(--surface)] px-6 py-10">
@@ -151,6 +157,7 @@ export const KanbanApp = () => {
         username={username}
         onLogout={handleLogout}
         isLoggingOut={submitState === "logout"}
+        onSessionExpired={handleSessionExpired}
       />
     );
   }
