@@ -1,11 +1,24 @@
+import secrets
 import os
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from starlette.middleware.sessions import SessionMiddleware
 
 DEFAULT_FRONTEND_DIST_DIR = Path(__file__).resolve().parents[2] / "frontend" / "out"
+AUTH_USERNAME = "user"
+AUTH_PASSWORD = "password"
+SESSION_COOKIE_NAME = "pm_session"
+SESSION_MAX_AGE = 60 * 60 * 24 * 30
+DEFAULT_SESSION_SECRET = "pm-mvp-dev-session-secret"
+
+
+class LoginRequest(BaseModel):
+  username: str
+  password: str
 
 
 def resolve_frontend_dist_dir(frontend_dist_dir: Path | None = None) -> Path:
@@ -19,8 +32,55 @@ def resolve_frontend_dist_dir(frontend_dist_dir: Path | None = None) -> Path:
   return DEFAULT_FRONTEND_DIST_DIR
 
 
+def resolve_session_secret() -> str:
+  return os.environ.get("SESSION_SECRET", DEFAULT_SESSION_SECRET)
+
+
+def get_authenticated_username(request: Request) -> str | None:
+  username = request.session.get("username")
+  if username == AUTH_USERNAME:
+    return username
+  return None
+
+
 def create_app(frontend_dist_dir: Path | None = None) -> FastAPI:
   app = FastAPI(title="Project Management MVP Backend")
+  app.add_middleware(
+    SessionMiddleware,
+    secret_key=resolve_session_secret(),
+    session_cookie=SESSION_COOKIE_NAME,
+    max_age=SESSION_MAX_AGE,
+    same_site="lax",
+  )
+
+  @app.get("/api/auth/session")
+  def read_session(request: Request) -> dict[str, str]:
+    username = get_authenticated_username(request)
+    if username is None:
+      raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+      )
+    return {"username": username}
+
+  @app.post("/api/auth/login")
+  def login(payload: LoginRequest, request: Request) -> dict[str, str]:
+    valid_username = secrets.compare_digest(payload.username, AUTH_USERNAME)
+    valid_password = secrets.compare_digest(payload.password, AUTH_PASSWORD)
+    if not (valid_username and valid_password):
+      raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid credentials",
+      )
+
+    request.session.clear()
+    request.session["username"] = AUTH_USERNAME
+    return {"username": AUTH_USERNAME}
+
+  @app.post("/api/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
+  def logout(request: Request) -> Response:
+    request.session.clear()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
   @app.get("/api/health")
   def read_health() -> dict[str, str]:

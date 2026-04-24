@@ -22,17 +22,21 @@ The `frontend/` directory contains the existing standalone Kanban demo. It is cu
 
 ## Current behavior
 
-- Renders a single-board Kanban UI with five columns.
+- Shows a login screen until the user authenticates with the demo account.
+- Renders a single-board Kanban UI with five columns after login.
 - Column titles are editable inline.
 - Cards can be dragged within and across columns.
 - Cards can be added and removed.
-- Board state is entirely client-side and starts from static seed data in `src/lib/kanban.ts`.
-- There is no backend integration, authentication, persistence, or AI UI yet.
+- Authentication uses backend session endpoints and a persistent HTTP-only cookie.
+- Board state is still entirely client-side and starts from static seed data in `src/lib/kanban.ts`.
+- There is no board persistence or AI UI yet.
 - There is currently no inline editing flow for existing card title/details beyond add and delete.
 
 ## Key files
 
 - `src/components/KanbanBoard.tsx`: top-level client component that owns board state and drag handlers.
+- `src/components/KanbanApp.tsx`: auth-aware client shell that checks session state and decides whether to render login or board UI.
+- `src/components/LoginForm.tsx`: login screen and credential form.
 - `src/components/KanbanColumn.tsx`: column shell, rename input, droppable area, and new-card form wiring.
 - `src/components/KanbanCard.tsx`: sortable card UI with delete action.
 - `src/components/NewCardForm.tsx`: local add-card form state.
@@ -41,16 +45,17 @@ The `frontend/` directory contains the existing standalone Kanban demo. It is cu
 
 ## Existing tests
 
+- `src/components/KanbanApp.test.tsx` covers unauthenticated load, login success, login failure, and logout.
 - `src/components/KanbanBoard.test.tsx` covers rendering, renaming a column, and adding/removing a card.
 - `src/lib/kanban.test.ts` covers card movement logic.
-- `tests/kanban.spec.ts` covers board load, add-card flow, and drag-and-drop flow in Playwright.
+- `tests/kanban.spec.ts` covers login gating, board load, add-card flow, drag-and-drop flow, session persistence, and logout in Playwright.
 
 ## Working guidance
 
 - Preserve the current visual language unless a later plan step explicitly changes it.
 - Treat this directory as the source of truth for the current Kanban UI behavior.
 - When integrating with the backend later, keep changes incremental so existing interactions stay testable.
-- Do not assume auth, persistence, or AI support already exists here.
+- Do not assume board persistence or AI support already exists here.
 
 ## Commands
 

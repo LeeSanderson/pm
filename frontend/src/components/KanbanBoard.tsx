@@ -15,7 +15,17 @@ import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
 
-export const KanbanBoard = () => {
+type KanbanBoardProps = {
+  username?: string;
+  onLogout?: () => void;
+  isLoggingOut?: boolean;
+};
+
+export const KanbanBoard = ({
+  username,
+  onLogout,
+  isLoggingOut = false,
+}: KanbanBoardProps) => {
   const [board, setBoard] = useState<BoardData>(() => initialData);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
 
@@ -111,13 +121,35 @@ export const KanbanBoard = () => {
                 and capture quick notes without getting buried in settings.
               </p>
             </div>
-            <div className="rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
-                Focus
-              </p>
-              <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
-                One board. Five columns. Zero clutter.
-              </p>
+            <div className="flex flex-col gap-3">
+              <div className="rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-5 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
+                  Focus
+                </p>
+                <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
+                  One board. Five columns. Zero clutter.
+                </p>
+              </div>
+              {onLogout ? (
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--stroke)] bg-white/90 px-5 py-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
+                      Session
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-[var(--navy-dark)]">
+                      Signed in as {username ?? "user"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    disabled={isLoggingOut}
+                    className="rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-[var(--navy-dark)] transition hover:border-[var(--primary-blue)] hover:text-[var(--primary-blue)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isLoggingOut ? "Logging out..." : "Log out"}
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">

@@ -8,6 +8,11 @@ The current app runs as a single Docker container and serves:
 - Example JSON API at `http://localhost:8000/api/hello`
 - Health endpoint at `http://localhost:8000/api/health`
 
+The Part 4 login uses the fixed demo credentials below:
+
+- Username: `user`
+- Password: `password`
+
 ## Start and stop
 
 Windows PowerShell:

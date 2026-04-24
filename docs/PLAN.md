@@ -111,22 +111,27 @@ Status:
 Goal: require a dummy login before showing the board and support logout.
 
 Checklist:
-- [ ] Define the minimal auth flow using hardcoded credentials `user` and `password`.
-- [ ] Implement persistent signed HTTP-only cookie-based session handling in FastAPI.
-- [ ] Add a login screen and logout affordance in the frontend.
-- [ ] Guard the Kanban page so unauthenticated users are redirected or shown login.
-- [ ] Return authenticated user state from the backend in a simple, testable way.
-- [ ] Document session behavior and credential limitations.
+- [x] Define the minimal auth flow using hardcoded credentials `user` and `password`.
+- [x] Implement persistent signed HTTP-only cookie-based session handling in FastAPI.
+- [x] Add a login screen and logout affordance in the frontend.
+- [x] Guard the Kanban page so unauthenticated users are redirected or shown login.
+- [x] Return authenticated user state from the backend in a simple, testable way.
+- [x] Document session behavior and credential limitations.
 
 Tests:
-- [ ] Backend unit tests for login, logout, invalid credentials, and session validation.
-- [ ] Frontend unit tests for login form behavior and authenticated/unauthenticated rendering.
-- [ ] Playwright tests for successful login, failed login, reload persistence, and logout.
+- [x] Backend unit tests for login, logout, invalid credentials, and session validation.
+- [x] Frontend unit tests for login form behavior and authenticated/unauthenticated rendering.
+- [x] Playwright tests for successful login, failed login, reload persistence, and logout.
 
 Success criteria:
 - Unauthenticated users cannot access the board UI.
 - Successful login persists across page reloads and app restarts.
 - Logout clears access and returns the user to the login experience.
+
+Status:
+- Completed on 2026-04-24.
+- FastAPI now provides persistent signed cookie auth for the fixed demo account.
+- Frontend login gating, logout, backend auth tests, frontend unit tests, integrated Playwright tests, and Docker auth smoke validation all passed.
 
 ## Part 5: Database Modeling
 
