@@ -9,7 +9,7 @@ The proposal should match what the application already does today:
 - one signed-in user session at a time for the demo flow
 - one board per user
 - a board shape that already exists in the frontend as a JSON aggregate
-- simple board mutations without premature normalization
+- simple board mutations today, with room to grow into richer querying later
 
 ## Current board shape
 
@@ -40,7 +40,7 @@ That shape already captures:
 - card order within each column
 - the full editable payload for each card
 
-This matters because every Part 6 and Part 7 operation can be expressed as: load one board, modify one in-memory aggregate, write one board back.
+This matters because the backend still needs to return this exact aggregate to the frontend, even if the persisted representation is relational.
 
 ## Options considered
 
@@ -137,25 +137,31 @@ Cons:
 - adds complexity before the MVP needs it
 - increases the risk of overengineering relative to the current product scope
 
-## Recommendation
+## Decision
 
-Recommend Option A for the MVP.
+The schema decision is Option B.
 
-Reasoning:
+Why this was chosen:
 
-- It is the simplest schema that supports all currently planned board mutations.
-- It preserves the existing frontend board structure without translation.
-- It keeps Part 6 focused on API behavior and persistence instead of schema choreography.
-- It still leaves a clean migration path to normalization later if the product needs richer querying.
+- it is more flexible for future changes
+- it is easier to reason about as explicit relational data
+- it keeps card ordering and column ordering visible in the schema instead of implicit inside a JSON blob
 
-## Proposed MVP schema
+## Recommended MVP schema
 
-Use two tables:
+Use four tables:
+
+- `users`
+- `boards`
+- `columns`
+- `cards`
+
+The frontend board shape stays the same at the API boundary. The backend assembles and returns that aggregate from relational rows.
 
 ### `users`
 
 Purpose:
-- future-proof the app for multiple users even though the demo login is fixed today
+- support the current demo user and future multi-user behavior
 
 Columns:
 - `id INTEGER PRIMARY KEY`
@@ -165,13 +171,11 @@ Columns:
 ### `boards`
 
 Purpose:
-- store exactly one board per user as a single JSON payload
+- represent one board owned by one user
 
 Columns:
 - `id INTEGER PRIMARY KEY`
 - `user_id INTEGER NOT NULL UNIQUE`
-- `schema_version INTEGER NOT NULL DEFAULT 1`
-- `board_json TEXT NOT NULL`
 - `created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
 - `updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP`
 
@@ -179,7 +183,85 @@ Constraints:
 - `user_id` is unique so a user can only own one board in the MVP
 - `FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE`
 
-Canonical payload stored in `board_json`:
+### `columns`
+
+Purpose:
+- store board columns and their order
+
+Columns:
+- `board_id INTEGER NOT NULL`
+- `column_id TEXT NOT NULL`
+- `title TEXT NOT NULL`
+- `sort_order INTEGER NOT NULL`
+
+Constraints:
+- `PRIMARY KEY (board_id, column_id)`
+- `UNIQUE (board_id, sort_order)`
+- `FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE`
+
+### `cards`
+
+Purpose:
+- store cards, their owning column, and their order within that column
+
+Columns:
+- `board_id INTEGER NOT NULL`
+- `card_id TEXT NOT NULL`
+- `column_id TEXT NOT NULL`
+- `title TEXT NOT NULL`
+- `details TEXT NOT NULL`
+- `sort_order INTEGER NOT NULL`
+
+Constraints:
+- `PRIMARY KEY (board_id, card_id)`
+- `UNIQUE (board_id, column_id, sort_order)`
+- `FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE`
+- `FOREIGN KEY (board_id, column_id) REFERENCES columns(board_id, column_id) ON DELETE CASCADE`
+
+## Schema sketch
+
+```sql
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE boards (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE columns (
+  board_id INTEGER NOT NULL,
+  column_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  sort_order INTEGER NOT NULL,
+  PRIMARY KEY (board_id, column_id),
+  UNIQUE (board_id, sort_order),
+  FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
+);
+
+CREATE TABLE cards (
+  board_id INTEGER NOT NULL,
+  card_id TEXT NOT NULL,
+  column_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  details TEXT NOT NULL,
+  sort_order INTEGER NOT NULL,
+  PRIMARY KEY (board_id, card_id),
+  UNIQUE (board_id, column_id, sort_order),
+  FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE,
+  FOREIGN KEY (board_id, column_id) REFERENCES columns(board_id, column_id) ON DELETE CASCADE
+);
+```
+
+## Mapping to the existing frontend shape
+
+The API returned to the frontend should remain:
 
 ```json
 {
@@ -188,11 +270,6 @@ Canonical payload stored in `board_json`:
       "id": "col-backlog",
       "title": "Backlog",
       "cardIds": ["card-1", "card-2"]
-    },
-    {
-      "id": "col-discovery",
-      "title": "Discovery",
-      "cardIds": ["card-3"]
     }
   ],
   "cards": {
@@ -205,6 +282,14 @@ Canonical payload stored in `board_json`:
 }
 ```
 
+The relational model stores the same information as:
+
+- one `boards` row
+- ordered `columns` rows for that board
+- ordered `cards` rows, each linked to a column
+
+The backend read path reconstructs the current aggregate from those rows.
+
 ## Read and write model
 
 ### User lookup
@@ -216,33 +301,35 @@ Canonical payload stored in `board_json`:
 ### Board initialization
 
 - When the user exists but has no `boards` row yet, create one automatically.
-- Seed `board_json` from the current default board data.
-- Set `schema_version = 1`.
+- Insert one `boards` row.
+- Seed the default column rows with `sort_order` values in display order.
+- Seed the default card rows with `column_id` and `sort_order` values matching the current frontend seed data.
 
 ### Board reads
 
-- Query `boards` by `user_id`.
-- Deserialize `board_json` into the existing Python/TypeScript board shape.
-- Return that payload directly to the frontend.
+- Query the `boards` row for the current user.
+- Query `columns` ordered by `sort_order`.
+- Query `cards` ordered by `column_id`, then `sort_order`.
+- Reconstruct the existing frontend board aggregate in Python.
+- Return that aggregate to the frontend.
 
 ### Board writes
 
-- Read the current board for the authenticated user.
-- Apply one validated mutation in Python.
-- Serialize the full board back into `board_json`.
-- Update `updated_at` in the same transaction.
+Apply validated mutation-specific writes in a transaction.
 
-For the MVP, whole-board writes are acceptable because:
+Examples:
 
-- there is only one board per user
-- edits are user-driven and low volume
-- the board payload is small
+- rename column: update `columns.title`
+- create card: insert into `cards` with the next `sort_order` in the target column
+- delete card: delete the row, then compact `sort_order` in that column
+- move card within a column: rewrite `sort_order` for the affected rows in that column
+- move card across columns: update `column_id`, then rewrite `sort_order` in both affected columns
+
+Each successful write should update `boards.updated_at`.
 
 ## API shape implication for Part 6
 
-This proposal supports either of these API styles:
-
-### Preferred MVP style
+The normalized schema aligns well with mutation-specific endpoints:
 
 - `GET /api/board`
 - `PATCH /api/board/columns/{columnId}` for rename
@@ -250,18 +337,11 @@ This proposal supports either of these API styles:
 - `DELETE /api/board/columns/{columnId}/cards/{cardId}`
 - `PATCH /api/board/cards/{cardId}/move`
 
-Each route can still:
+This is preferable to a whole-board `PUT` for the normalized design because:
 
-- load one board aggregate
-- modify it in memory
-- write one JSON payload back
-
-### Simpler fallback
-
-- `GET /api/board`
-- `PUT /api/board`
-
-That is even simpler technically, but the first style gives cleaner backend validation and smaller frontend payloads.
+- each endpoint maps naturally to a small relational write
+- validation is clearer per mutation
+- it avoids sending the full board payload for every small change
 
 ## Initialization and migrations
 
@@ -276,15 +356,17 @@ Initial migration should create:
 
 - `users`
 - `boards`
+- `columns`
+- `cards`
 - indexes implied by the unique constraints
 
 Migration strategy after that:
 
 - keep database schema versioning in `PRAGMA user_version`
-- keep board payload versioning in `boards.schema_version`
-- if the JSON payload shape changes later, migrate rows in Python on startup or in an explicit migration step
+- add future migrations as explicit table/index evolution steps
+- keep the API response shape stable even if storage evolves internally
 
-That split keeps relational migrations separate from payload migrations.
+Unlike the JSON-board design, this option does not need a separate per-board payload version column.
 
 ## Why this is the right cutoff for now
 
@@ -292,17 +374,16 @@ This design deliberately does not add:
 
 - separate database-backed session storage
 - chat history persistence
-- normalized card and column tables
 - audit trails or event sourcing
 
-Those would all be valid future directions, but none are required to support the current MVP parts.
+It does add normalized board storage now, because that is the chosen tradeoff for flexibility and clarity.
 
-## Approval requested
+## Approved decision
 
-Recommended approval target:
+Approved target:
 
-- adopt `users` plus `boards(board_json)` as the MVP schema
-- keep `board_json` aligned to the current frontend board shape
-- use `PRAGMA user_version` for schema migrations and `boards.schema_version` for payload versioning
+- adopt `users`, `boards`, `columns`, and `cards` as the MVP schema
+- keep the frontend API payload in the current board aggregate shape
+- use `PRAGMA user_version` for schema migrations
 
-If approved, Part 6 can implement the persistence layer against this design without reopening the schema decision.
+Part 6 should implement persistence against this relational schema.

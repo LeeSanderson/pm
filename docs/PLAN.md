@@ -143,10 +143,10 @@ Checklist:
 - [x] Recommend one schema for the MVP with reasoning focused on simplicity and future multi-user support.
 - [x] Define how board reads, writes, initialization, and migrations will work.
 - [x] Document the proposal in `docs/`.
-- [ ] Ask the user to approve the schema before implementation begins.
+- [x] Ask the user to approve the schema before implementation begins.
 
 Tests:
-- [ ] Documentation review only; no schema implementation tests yet.
+- [x] Documentation review only; no schema implementation tests yet.
 
 Success criteria:
 - The proposal clearly defines the stored entities, JSON usage, and how a user maps to a board.
@@ -157,9 +157,9 @@ Approval gate:
 - Required before Part 6.
 
 Status:
-- Proposal prepared on 2026-04-24.
-- Recommended schema is documented in `docs/DATABASE.md`.
-- Waiting for user approval before Part 6.
+- Completed on 2026-04-24.
+- Approved schema is documented in `docs/DATABASE.md`.
+- Option B, the normalized relational schema, is the chosen design for Part 6.
 
 ## Part 6: Backend
 
