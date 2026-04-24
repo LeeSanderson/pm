@@ -1,1 +1,13 @@
-This folder will contain start and stop scripts for Mac, PC and Linux
+## Scripts Agent Notes
+
+This folder contains helper scripts for running and stopping the local Docker-based app.
+
+Current scope in Part 2:
+- Build the single application image.
+- Start the container locally on port 8000.
+- Stop and remove the local container cleanly.
+
+Working guidance:
+- Keep scripts explicit and readable.
+- Prefer deterministic container names and image tags.
+- Avoid adding environment-specific behavior unless it is required.

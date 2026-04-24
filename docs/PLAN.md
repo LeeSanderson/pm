@@ -54,25 +54,29 @@ Status:
 Goal: stand up the backend, container, and local scripts with a minimal working FastAPI plus static HTML proof of life.
 
 Checklist:
-- [ ] Create backend project structure in `backend/` using FastAPI.
-- [ ] Add Python dependency management suitable for `uv` in Docker.
-- [ ] Add an app entrypoint and a health-style API endpoint.
-- [ ] Add a temporary static HTML response at `/` served by FastAPI.
-- [ ] Create a single-image Dockerfile that can run the backend locally.
-- [ ] Add cross-platform start and stop scripts in `scripts/` for Windows, macOS, and Linux.
-- [ ] Document how to run the scaffold locally.
+- [x] Create backend project structure in `backend/` using FastAPI.
+- [x] Add Python dependency management suitable for `uv` in Docker.
+- [x] Add an app entrypoint and a health-style API endpoint.
+- [x] Add a temporary static HTML response at `/` served by FastAPI.
+- [x] Create a single-image Dockerfile that can run the backend locally.
+- [x] Add cross-platform start and stop scripts in `scripts/` for Windows, macOS, and Linux.
+- [x] Document how to run the scaffold locally.
 
 Tests:
-- [ ] Backend unit test for the health/example API route.
-- [ ] Backend integration test confirming `/` returns the temporary HTML.
-- [ ] Docker smoke test that the container starts and responds locally.
-- [ ] Script smoke test on the current platform.
+- [x] Backend unit test for the health/example API route.
+- [x] Backend integration test confirming `/` returns the temporary HTML.
+- [x] Docker smoke test that the container starts and responds locally.
+- [x] Script smoke test on the current platform.
 
 Success criteria:
 - `docker build` succeeds.
 - Starting the app locally serves example HTML at `/`.
 - The example page can make at least one successful API call to the backend.
 - Start and stop scripts work on the validated platform and are documented for the others.
+
+Status:
+- Completed on 2026-04-24.
+- Backend scaffold, Docker image, local scripts, and runtime validation are complete.
 
 ## Part 3: Add In Frontend
 
