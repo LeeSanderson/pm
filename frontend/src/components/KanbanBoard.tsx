@@ -11,11 +11,13 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import { AIChatSidebar, type AIChatSubmitResult } from "@/components/AIChatSidebar";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import {
   addCard as addCardRequest,
   BoardApiError,
+  chatWithAI,
   deleteCard as deleteCardRequest,
   fetchBoard,
   moveCard as moveCardRequest,
@@ -66,7 +68,9 @@ export const KanbanBoard = ({
   const [boardStatus, setBoardStatus] = useState<BoardStatus>("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAiPending, setIsAiPending] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const isBusy = isSaving || isAiPending;
 
   const handleSessionExpired = useEffectEvent(() => {
     onSessionExpired?.();
@@ -120,7 +124,7 @@ export const KanbanBoard = ({
   const cardsById = useMemo(() => board?.cards ?? {}, [board]);
 
   const handleDragStart = (event: DragStartEvent) => {
-    if (isSaving) {
+    if (isBusy) {
       return;
     }
 
@@ -131,7 +135,7 @@ export const KanbanBoard = ({
     const { active, over } = event;
     setActiveCardId(null);
 
-    if (!board || isSaving || !over || active.id === over.id) {
+    if (!board || isBusy || !over || active.id === over.id) {
       return;
     }
 
@@ -177,7 +181,7 @@ export const KanbanBoard = ({
   };
 
   const handleRenameColumn = async (columnId: string, title: string) => {
-    if (!board || isSaving) {
+    if (!board || isBusy) {
       return;
     }
 
@@ -216,7 +220,7 @@ export const KanbanBoard = ({
   };
 
   const handleAddCard = async (columnId: string, title: string, details: string) => {
-    if (!board || isSaving) {
+    if (!board || isBusy) {
       return;
     }
 
@@ -238,7 +242,7 @@ export const KanbanBoard = ({
   };
 
   const handleDeleteCard = async (columnId: string, cardId: string) => {
-    if (!board || isSaving) {
+    if (!board || isBusy) {
       return;
     }
 
@@ -256,6 +260,33 @@ export const KanbanBoard = ({
       setErrorMessage(getErrorMessage(error, "Unable to delete card."));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleAIChat = async (message: string): Promise<AIChatSubmitResult> => {
+    if (!board || isBusy) {
+      throw new Error("Please wait for current board changes to finish.");
+    }
+
+    setIsAiPending(true);
+
+    try {
+      const response = await chatWithAI(message);
+      setBoard(response.board);
+      return {
+        assistantMessage: response.assistantMessage,
+        appliedOperations: response.appliedOperations,
+        model: response.model,
+      };
+    } catch (error) {
+      if (error instanceof BoardApiError && error.status === 401) {
+        handleSessionExpired();
+        throw new Error("Your session expired. Sign in again.");
+      }
+
+      throw error;
+    } finally {
+      setIsAiPending(false);
     }
   };
 
@@ -332,7 +363,11 @@ export const KanbanBoard = ({
                   Sync
                 </p>
                 <p className="mt-2 text-sm font-semibold text-[var(--navy-dark)]">
-                  {isSaving ? "Saving changes..." : "Changes persist automatically."}
+                  {isAiPending
+                    ? "Applying AI changes..."
+                    : isSaving
+                      ? "Saving changes..."
+                      : "Changes persist automatically."}
                 </p>
               </div>
               {onLogout ? (
@@ -384,18 +419,23 @@ export const KanbanBoard = ({
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <section className="grid gap-6 lg:grid-cols-5">
-            {board.columns.map((column) => (
-              <KanbanColumn
-                key={column.id}
-                column={column}
-                cards={column.cardIds.map((cardId) => board.cards[cardId])}
-                onRename={handleRenameColumn}
-                onAddCard={handleAddCard}
-                onDeleteCard={handleDeleteCard}
-              />
-            ))}
-          </section>
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="overflow-x-auto pb-4">
+              <section className="grid min-w-[1120px] gap-6 lg:grid-cols-5">
+                {board.columns.map((column) => (
+                  <KanbanColumn
+                    key={column.id}
+                    column={column}
+                    cards={column.cardIds.map((cardId) => board.cards[cardId])}
+                    onRename={handleRenameColumn}
+                    onAddCard={handleAddCard}
+                    onDeleteCard={handleDeleteCard}
+                  />
+                ))}
+              </section>
+            </div>
+            <AIChatSidebar onSubmit={handleAIChat} disabled={isBusy} />
+          </div>
           <DragOverlay>
             {activeCard ? (
               <div className="w-[260px]">

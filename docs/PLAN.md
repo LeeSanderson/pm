@@ -278,23 +278,28 @@ Status:
 Goal: add the sidebar chat experience and refresh the board automatically when AI-driven mutations occur.
 
 Checklist:
-- [ ] Design and implement a sidebar chat UI that fits the existing visual language.
-- [ ] Add message input, submission, loading, error, and response rendering states.
-- [ ] Hook the UI into the backend AI endpoint.
-- [ ] Refresh or reconcile board state automatically after AI-driven updates.
-- [ ] Keep the Kanban and chat interactions usable on desktop and mobile widths.
-- [ ] Document how to use the AI feature and its MVP limits.
+- [x] Design and implement a sidebar chat UI that fits the existing visual language.
+- [x] Add message input, submission, loading, error, and response rendering states.
+- [x] Hook the UI into the backend AI endpoint.
+- [x] Refresh or reconcile board state automatically after AI-driven updates.
+- [x] Keep the Kanban and chat interactions usable on desktop and mobile widths.
+- [x] Document how to use the AI feature and its MVP limits.
 
 Tests:
-- [ ] Frontend unit tests for chat widget state transitions.
-- [ ] Backend integration tests for the AI route used by the sidebar.
-- [ ] Playwright tests for sending a chat prompt, receiving a response, and seeing the board refresh.
-- [ ] Playwright test for an AI no-op response that leaves the board unchanged.
+- [x] Frontend unit tests for chat widget state transitions.
+- [x] Backend integration tests for the AI route used by the sidebar.
+- [x] Playwright tests for sending a chat prompt, receiving a response, and seeing the board refresh.
+- [x] Playwright test for an AI no-op response that leaves the board unchanged.
 
 Success criteria:
 - Users can chat with the assistant from the sidebar.
 - AI-generated board updates appear in the UI automatically.
 - The chat UI is usable without compromising the existing board experience.
+
+Status:
+- Completed on 2026-04-28.
+- The frontend now includes an AI sidebar wired to `POST /api/ai/chat`, renders chat state locally, and refreshes the board from backend AI responses.
+- Frontend unit tests, backend AI route tests from Part 9, and full Playwright coverage passed for chat-driven board updates and AI no-op replies.
 
 ## Review checkpoint
 

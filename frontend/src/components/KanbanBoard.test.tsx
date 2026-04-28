@@ -87,6 +87,63 @@ const createBoardApiMock = () => {
       return jsonResponse(currentBoard());
     }
 
+    if (url === "/api/ai/chat" && method === "POST") {
+      const payload = JSON.parse(String(init?.body ?? "{}")) as { message: string };
+      if (/move the roadmap card/i.test(payload.message)) {
+        const movedCardId = "card-1";
+        const newCardId = `card-test-${nextCardId++}`;
+        board = {
+          ...board,
+          cards: {
+            ...board.cards,
+            [movedCardId]: {
+              ...board.cards[movedCardId],
+              details: "Moved into review with AI guidance.",
+            },
+            [newCardId]: {
+              id: newCardId,
+              title: "Prep roadmap summary",
+              details: "Share the updated review notes with stakeholders.",
+            },
+          },
+          columns: board.columns.map((column) => {
+            if (column.id === "col-backlog") {
+              return { ...column, cardIds: [...column.cardIds, newCardId] };
+            }
+
+            if (column.id === "col-review") {
+              return {
+                ...column,
+                cardIds: [movedCardId, ...column.cardIds.filter((id) => id !== movedCardId)],
+              };
+            }
+
+            return {
+              ...column,
+              cardIds: column.cardIds.filter((id) => id !== movedCardId),
+            };
+          }),
+        };
+
+        return jsonResponse({
+          assistantMessage: "I moved the roadmap card into Review and added a prep task.",
+          appliedOperations: [
+            { type: "move_card" },
+            { type: "create_card" },
+          ],
+          board: currentBoard(),
+          model: "dummy/openrouter-chat",
+        });
+      }
+
+      return jsonResponse({
+        assistantMessage: "No board changes needed.",
+        appliedOperations: [],
+        board: currentBoard(),
+        model: "dummy/openrouter-chat",
+      });
+    }
+
     return jsonResponse({ detail: `Unhandled request: ${method} ${url}` }, 500);
   });
 };
@@ -167,5 +224,29 @@ describe("KanbanBoard", () => {
     });
 
     expect(screen.queryByText("New card")).not.toBeInTheDocument();
+  });
+
+  it("submits a chat prompt and refreshes the board from the AI response", async () => {
+    render(<KanbanBoard />);
+
+    await screen.findByTestId("ai-sidebar");
+    await userEvent.type(
+      screen.getByLabelText(/ask the assistant/i),
+      "Move the roadmap card into review and add a prep task."
+    );
+    await userEvent.click(screen.getByRole("button", { name: /^send$/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ai/chat",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+
+    expect(
+      await screen.findByText("I moved the roadmap card into Review and added a prep task.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Prep roadmap summary")).toBeInTheDocument();
+    expect(screen.getByText(/2 board changes applied/i)).toBeInTheDocument();
   });
 });

@@ -11,23 +11,31 @@ const frontendDistDir = path.join(frontendDir, "out");
 const e2eDataDir = path.join(frontendDir, ".playwright");
 const e2eDbPath = path.join(e2eDataDir, "e2e.sqlite3");
 const port = process.env.PM_E2E_PORT ?? "4100";
-
-mkdirSync(e2eDataDir, { recursive: true });
-rmSync(e2eDbPath, { force: true });
-
-const syncResult = spawnSync("uv", ["sync", "--dev"], {
-  cwd: backendDir,
-  stdio: "inherit",
-});
-
-if (syncResult.status !== 0) {
-  process.exit(syncResult.status ?? 1);
-}
-
 const pythonExecutable =
   process.platform === "win32"
     ? path.join(backendDir, ".venv", "Scripts", "python.exe")
     : path.join(backendDir, ".venv", "bin", "python");
+
+mkdirSync(e2eDataDir, { recursive: true });
+rmSync(e2eDbPath, { force: true });
+
+const uvVersionCheck = spawnSync("uv", ["--version"], {
+  cwd: backendDir,
+  stdio: "ignore",
+});
+
+if (uvVersionCheck.status === 0) {
+  const syncResult = spawnSync("uv", ["sync", "--dev"], {
+    cwd: backendDir,
+    stdio: "inherit",
+  });
+
+  if (syncResult.status !== 0) {
+    process.exit(syncResult.status ?? 1);
+  }
+} else {
+  console.log("uv not found on PATH. Reusing the existing backend virtualenv for Playwright.");
+}
 
 if (!existsSync(pythonExecutable)) {
   console.error(`Backend Python executable not found at ${pythonExecutable}`);

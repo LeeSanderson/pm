@@ -1,5 +1,17 @@
 import type { BoardData } from "@/lib/kanban";
 
+export type AIChatOperation = {
+  type: string;
+  [key: string]: string | number | undefined;
+};
+
+export type AIChatResponse = {
+  assistantMessage: string;
+  appliedOperations: AIChatOperation[];
+  board: BoardData;
+  model: string;
+};
+
 type ErrorPayload = {
   detail?: string;
 };
@@ -23,11 +35,11 @@ const getErrorMessage = async (response: Response, fallback: string) => {
   }
 };
 
-const requestBoard = async (
+const requestJson = async <T>(
   input: string,
   init: RequestInit | undefined,
   fallbackMessage: string
-): Promise<BoardData> => {
+): Promise<T> => {
   const response = await fetch(input, {
     credentials: "same-origin",
     ...init,
@@ -40,8 +52,14 @@ const requestBoard = async (
     );
   }
 
-  return (await response.json()) as BoardData;
+  return (await response.json()) as T;
 };
+
+const requestBoard = async (
+  input: string,
+  init: RequestInit | undefined,
+  fallbackMessage: string
+): Promise<BoardData> => requestJson<BoardData>(input, init, fallbackMessage);
 
 export const fetchBoard = () => requestBoard("/api/board", undefined, "Unable to load board.");
 
@@ -91,4 +109,17 @@ export const moveCard = (cardId: string, columnId: string, position: number) =>
       body: JSON.stringify({ column_id: columnId, position }),
     },
     "Unable to move card."
+  );
+
+export const chatWithAI = (message: string) =>
+  requestJson<AIChatResponse>(
+    "/api/ai/chat",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ message }),
+    },
+    "Unable to reach the AI assistant."
   );

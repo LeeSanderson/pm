@@ -28,13 +28,15 @@ The `frontend/` directory contains the existing standalone Kanban demo. It is cu
 - Cards can be dragged within and across columns.
 - Cards can be added and removed.
 - Authentication uses backend session endpoints and a persistent HTTP-only cookie.
-- Board state is still entirely client-side and starts from static seed data in `src/lib/kanban.ts`.
-- There is no board persistence or AI UI yet.
+- Board state is fetched from the backend and refreshed from backend mutation responses.
+- An AI chat sidebar can create, move, rename, update, and delete board items through the backend AI route.
+- AI replies and chat history render in the sidebar, but chat history only persists for the current backend process and session.
 - There is currently no inline editing flow for existing card title/details beyond add and delete.
 
 ## Key files
 
 - `src/components/KanbanBoard.tsx`: top-level client component that owns board state and drag handlers.
+- `src/components/AIChatSidebar.tsx`: sidebar chat UI for the board-aware AI workflow.
 - `src/components/KanbanApp.tsx`: auth-aware client shell that checks session state and decides whether to render login or board UI.
 - `src/components/LoginForm.tsx`: login screen and credential form.
 - `src/components/KanbanColumn.tsx`: column shell, rename input, droppable area, and new-card form wiring.
@@ -46,16 +48,16 @@ The `frontend/` directory contains the existing standalone Kanban demo. It is cu
 ## Existing tests
 
 - `src/components/KanbanApp.test.tsx` covers unauthenticated load, login success, login failure, and logout.
-- `src/components/KanbanBoard.test.tsx` covers rendering, renaming a column, and adding/removing a card.
+- `src/components/KanbanBoard.test.tsx` covers rendering, renaming a column, adding/removing a card, and AI-driven board refresh.
+- `src/components/AIChatSidebar.test.tsx` covers chat loading, success, and error states.
 - `src/lib/kanban.test.ts` covers card movement logic.
-- `tests/kanban.spec.ts` covers login gating, board load, add-card flow, drag-and-drop flow, session persistence, and logout in Playwright.
+- `tests/kanban.spec.ts` covers login gating, board load, add-card flow, drag-and-drop flow, session persistence, logout, AI board refresh, and AI no-op behavior in Playwright.
 
 ## Working guidance
 
 - Preserve the current visual language unless a later plan step explicitly changes it.
 - Treat this directory as the source of truth for the current Kanban UI behavior.
-- When integrating with the backend later, keep changes incremental so existing interactions stay testable.
-- Do not assume board persistence or AI support already exists here.
+- Keep AI interactions and manual board mutations serialized so UI state stays deterministic.
 
 ## Commands
 

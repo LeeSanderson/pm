@@ -25,6 +25,22 @@ If the key is missing, the backend returns a clear `503` error when the AI route
 The Part 9 board-aware AI route is documented in `docs/AI_API.md`.
 It keeps chat history in backend memory for the current authenticated session and does not write that history to SQLite.
 
+## AI sidebar usage
+
+After signing in, the board page includes an AI sidebar.
+
+- Type a request such as moving a card, adding a card, or renaming a column.
+- Click `Send` and wait for the assistant reply.
+- If the AI returns board operations, the UI replaces the current board state with the backend response automatically.
+- If the AI returns no board changes, the assistant reply still appears and the board stays as-is.
+
+Current MVP limits:
+
+- Chat history is only kept in backend memory for the current session.
+- Chat history is cleared on logout or backend restart.
+- The sidebar does not yet support retrying or editing a previous AI prompt in place.
+- Existing manual board edits and AI submissions are serialized; while one is in flight, the other interactions wait.
+
 ## Start and stop
 
 Windows PowerShell:
