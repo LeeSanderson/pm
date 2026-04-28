@@ -8,6 +8,14 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.ai_board import (
+  AIChatRequest,
+  ConversationStore,
+  build_ai_chat_prompt,
+  parse_ai_chat_response,
+  serialize_operations,
+)
+
 from app.ai_client import (
   OPENROUTER_PROBE_PROMPT,
   AIClient,
@@ -30,6 +38,7 @@ AUTH_PASSWORD = "password"
 SESSION_COOKIE_NAME = "pm_session"
 SESSION_MAX_AGE = 60 * 60 * 24 * 30
 DEFAULT_SESSION_SECRET = "pm-mvp-dev-session-secret"
+CHAT_SESSION_KEY = "chat_session_id"
 
 
 class LoginRequest(BaseModel):
@@ -110,6 +119,7 @@ def create_app(
 ) -> FastAPI:
   app = FastAPI(title="Project Management MVP Backend")
   board_store = BoardStore(resolve_db_path(db_path))
+  conversation_store = ConversationStore()
   board_store.initialize()
   app.add_middleware(
     SessionMiddleware,
@@ -133,12 +143,14 @@ def create_app(
         detail="Invalid credentials",
       )
 
+    clear_conversation_history(request, conversation_store)
     request.session.clear()
     request.session["username"] = AUTH_USERNAME
     return {"username": AUTH_USERNAME}
 
   @app.post("/api/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
   def logout(request: Request) -> Response:
+    clear_conversation_history(request, conversation_store)
     request.session.clear()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -163,6 +175,41 @@ def create_app(
       "model": active_ai_client.model,
       "prompt": OPENROUTER_PROBE_PROMPT,
       "reply": reply,
+    }
+
+  @app.post("/api/ai/chat")
+  def chat_with_ai(payload: AIChatRequest, request: Request) -> dict[str, object]:
+    username = require_authenticated_username(request)
+    board = board_store.get_board(username)
+    history_key = get_or_create_chat_session_id(request)
+    prompt = build_ai_chat_prompt(
+      board,
+      conversation_store.get_messages(history_key),
+      payload.message,
+    )
+
+    try:
+      active_ai_client = ai_client or resolve_ai_client()
+      raw_reply = active_ai_client.generate_text(prompt)
+      parsed_reply = parse_ai_chat_response(raw_reply)
+      operations = serialize_operations(parsed_reply.board_operations)
+      next_board = board_store.apply_ai_operations(username, operations)
+    except AIConfigurationError as error:
+      raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+    except AIResponseError as error:
+      raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
+    except (BoardValidationError, ColumnNotFoundError, CardNotFoundError) as error:
+      raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=f"AI response contained an invalid board operation: {error}",
+      ) from error
+
+    conversation_store.append_turn(history_key, payload.message, parsed_reply.assistant_message)
+    return {
+      "assistantMessage": parsed_reply.assistant_message,
+      "appliedOperations": operations,
+      "board": next_board,
+      "model": active_ai_client.model,
     }
 
   if is_test_api_enabled():
@@ -266,5 +313,21 @@ def create_app(
 
 
 app = create_app()
+
+
+def clear_conversation_history(request: Request, conversation_store: ConversationStore) -> None:
+  history_key = request.session.get(CHAT_SESSION_KEY)
+  if isinstance(history_key, str) and history_key:
+    conversation_store.clear(history_key)
+
+
+def get_or_create_chat_session_id(request: Request) -> str:
+  history_key = request.session.get(CHAT_SESSION_KEY)
+  if isinstance(history_key, str) and history_key:
+    return history_key
+
+  history_key = secrets.token_urlsafe(16)
+  request.session[CHAT_SESSION_KEY] = history_key
+  return history_key
 
 

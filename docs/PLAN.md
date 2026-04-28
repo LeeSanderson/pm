@@ -250,23 +250,28 @@ Status:
 Goal: always send the board state plus user request to the model and receive a structured response that can optionally update the board.
 
 Checklist:
-- [ ] Define the request payload sent to the model, including board JSON and conversation history held in memory for the current chat session.
-- [ ] Define the structured response schema with both chat reply content and optional board update instructions.
-- [ ] Validate and parse the model response defensively enough to reject invalid outputs.
-- [ ] Apply approved board mutations on the backend.
-- [ ] Return both the assistant message and the updated board payload to the frontend.
-- [ ] Document the AI contract in `docs/`.
+- [x] Define the request payload sent to the model, including board JSON and conversation history held in memory for the current chat session.
+- [x] Define the structured response schema with both chat reply content and optional board update instructions.
+- [x] Validate and parse the model response defensively enough to reject invalid outputs.
+- [x] Apply approved board mutations on the backend.
+- [x] Return both the assistant message and the updated board payload to the frontend.
+- [x] Document the AI contract in `docs/`.
 
 Tests:
-- [ ] Backend unit tests for schema validation and invalid model outputs.
-- [ ] Backend integration tests for no-op replies and board-mutating replies.
-- [ ] Dummy AI integration tests covering multiple card/column update scenarios.
-- [ ] Opt-in live integration test covering one real structured-output interaction.
+- [x] Backend unit tests for schema validation and invalid model outputs.
+- [x] Backend integration tests for no-op replies and board-mutating replies.
+- [x] Dummy AI integration tests covering multiple card/column update scenarios.
+- [x] Opt-in live integration test covering one real structured-output interaction.
 
 Success criteria:
 - The backend consistently returns a typed response the frontend can consume.
 - Valid AI-generated board changes are persisted.
 - Invalid or partial AI outputs fail safely without corrupting the board.
+
+Status:
+- Completed on 2026-04-28.
+- The backend now exposes `POST /api/ai/chat`, sends board state plus in-memory session history to the model, validates the structured JSON reply, and applies AI-generated board mutations atomically.
+- Backend unit tests, backend integration tests, and an opt-in live OpenRouter structured-output test cover the Part 9 contract.
 
 ## Part 10: AI Sidebar UI
 

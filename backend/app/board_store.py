@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import secrets
 import sqlite3
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 DEFAULT_BOARD = {
@@ -145,81 +146,54 @@ class BoardStore:
 
   def rename_column(self, username: str, column_id: str, title: str) -> dict[str, object]:
     normalized_title = self._normalize_title(title, "Column title is required")
-    connection = self._connect()
-    try:
-      board_id = self._ensure_board(connection, username)
-      updated = connection.execute(
-        "UPDATE columns SET title = ? WHERE board_id = ? AND column_id = ?",
-        (normalized_title, board_id, column_id),
-      )
-      if updated.rowcount == 0:
-        raise ColumnNotFoundError("Column not found")
-      self._touch_board(connection, board_id)
-      connection.commit()
-      return self._load_board(connection, board_id)
-    finally:
-      connection.close()
+    return self._mutate_board(
+      username,
+      lambda connection, board_id: self._rename_column_for_board(
+        connection,
+        board_id,
+        column_id,
+        normalized_title,
+      ),
+    )
 
   def add_card(self, username: str, column_id: str, title: str, details: str) -> dict[str, object]:
     normalized_title = self._normalize_title(title, "Card title is required")
     normalized_details = self._normalize_details(details)
-    connection = self._connect()
-    try:
-      board_id = self._ensure_board(connection, username)
-      self._require_column(connection, board_id, column_id)
-      next_order = connection.execute(
-        "SELECT COALESCE(MAX(sort_order) + 1, 0) FROM cards WHERE board_id = ? AND column_id = ?",
-        (board_id, column_id),
-      ).fetchone()[0]
-      card_id = self._generate_card_id()
-      connection.execute(
-        "INSERT INTO cards (board_id, card_id, column_id, title, details, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
-        (board_id, card_id, column_id, normalized_title, normalized_details, next_order),
-      )
-      self._touch_board(connection, board_id)
-      connection.commit()
-      return self._load_board(connection, board_id)
-    finally:
-      connection.close()
+    return self._mutate_board(
+      username,
+      lambda connection, board_id: self._add_card_for_board(
+        connection,
+        board_id,
+        column_id,
+        normalized_title,
+        normalized_details,
+      ),
+    )
 
   def update_card(self, username: str, card_id: str, title: str, details: str) -> dict[str, object]:
     normalized_title = self._normalize_title(title, "Card title is required")
     normalized_details = self._normalize_details(details)
-    connection = self._connect()
-    try:
-      board_id = self._ensure_board(connection, username)
-      updated = connection.execute(
-        "UPDATE cards SET title = ?, details = ? WHERE board_id = ? AND card_id = ?",
-        (normalized_title, normalized_details, board_id, card_id),
-      )
-      if updated.rowcount == 0:
-        raise CardNotFoundError("Card not found")
-      self._touch_board(connection, board_id)
-      connection.commit()
-      return self._load_board(connection, board_id)
-    finally:
-      connection.close()
+    return self._mutate_board(
+      username,
+      lambda connection, board_id: self._update_card_for_board(
+        connection,
+        board_id,
+        card_id,
+        normalized_title,
+        normalized_details,
+      ),
+    )
 
   def delete_card(self, username: str, column_id: str, card_id: str) -> dict[str, object]:
-    connection = self._connect()
-    try:
-      board_id = self._ensure_board(connection, username)
-      card_row = self._require_card(connection, board_id, card_id)
-      if card_row["column_id"] != column_id:
-        raise CardNotFoundError("Card not found in column")
-
-      remaining_ids = self._get_ordered_card_ids(connection, board_id, column_id)
-      remaining_ids.remove(card_id)
-      connection.execute(
-        "DELETE FROM cards WHERE board_id = ? AND card_id = ?",
-        (board_id, card_id),
-      )
-      self._rewrite_column_order(connection, board_id, column_id, remaining_ids)
-      self._touch_board(connection, board_id)
-      connection.commit()
-      return self._load_board(connection, board_id)
-    finally:
-      connection.close()
+    return self._mutate_board(
+      username,
+      lambda connection, board_id: self._delete_card_for_board(
+        connection,
+        board_id,
+        card_id,
+        expected_column_id=column_id,
+      ),
+    )
 
   def move_card(
     self,
@@ -228,45 +202,78 @@ class BoardStore:
     target_column_id: str,
     position: int,
   ) -> dict[str, object]:
-    connection = self._connect()
-    try:
-      board_id = self._ensure_board(connection, username)
-      self._require_column(connection, board_id, target_column_id)
-      card_row = self._require_card(connection, board_id, card_id)
-      source_column_id = card_row["column_id"]
+    return self._mutate_board(
+      username,
+      lambda connection, board_id: self._move_card_for_board(
+        connection,
+        board_id,
+        card_id,
+        target_column_id,
+        position,
+      ),
+    )
 
-      if position < 0:
-        raise BoardValidationError("Position must be zero or greater")
+  def apply_ai_operations(
+    self,
+    username: str,
+    operations: Sequence[dict[str, object]],
+  ) -> dict[str, object]:
+    if not operations:
+      return self.get_board(username)
 
-      if source_column_id == target_column_id:
-        ordered_ids = self._get_ordered_card_ids(connection, board_id, source_column_id)
-        ordered_ids.remove(card_id)
-        if position > len(ordered_ids):
-          raise BoardValidationError("Position is out of range")
-        ordered_ids.insert(position, card_id)
-        self._rewrite_column_order(connection, board_id, source_column_id, ordered_ids)
-      else:
-        source_ids = self._get_ordered_card_ids(connection, board_id, source_column_id)
-        source_ids.remove(card_id)
-        target_ids = self._get_ordered_card_ids(connection, board_id, target_column_id)
-        if position > len(target_ids):
-          raise BoardValidationError("Position is out of range")
+    def mutate(connection: sqlite3.Connection, board_id: int) -> None:
+      for operation in operations:
+        operation_type = operation["type"]
+        if operation_type == "rename_column":
+          self._rename_column_for_board(
+            connection,
+            board_id,
+            str(operation["column_id"]),
+            self._normalize_title(str(operation["title"]), "Column title is required"),
+          )
+          continue
 
-        self._prepare_column_for_reorder(connection, board_id, source_column_id)
-        self._prepare_column_for_reorder(connection, board_id, target_column_id)
-        connection.execute(
-          "UPDATE cards SET column_id = ?, sort_order = ? WHERE board_id = ? AND card_id = ?",
-          (target_column_id, 2_000_000, board_id, card_id),
-        )
-        target_ids.insert(position, card_id)
-        self._apply_column_order(connection, board_id, source_column_id, source_ids)
-        self._apply_column_order(connection, board_id, target_column_id, target_ids)
+        if operation_type == "create_card":
+          self._add_card_for_board(
+            connection,
+            board_id,
+            str(operation["column_id"]),
+            self._normalize_title(str(operation["title"]), "Card title is required"),
+            self._normalize_details(str(operation.get("details", ""))),
+          )
+          continue
 
-      self._touch_board(connection, board_id)
-      connection.commit()
-      return self._load_board(connection, board_id)
-    finally:
-      connection.close()
+        if operation_type == "update_card":
+          self._update_card_for_board(
+            connection,
+            board_id,
+            str(operation["card_id"]),
+            self._normalize_title(str(operation["title"]), "Card title is required"),
+            self._normalize_details(str(operation["details"])),
+          )
+          continue
+
+        if operation_type == "move_card":
+          self._move_card_for_board(
+            connection,
+            board_id,
+            str(operation["card_id"]),
+            str(operation["column_id"]),
+            int(operation["position"]),
+          )
+          continue
+
+        if operation_type == "delete_card":
+          self._delete_card_for_board(
+            connection,
+            board_id,
+            str(operation["card_id"]),
+          )
+          continue
+
+        raise BoardValidationError("Unsupported AI operation")
+
+    return self._mutate_board(username, mutate)
 
   def reset_board(self, username: str) -> dict[str, object]:
     connection = self._connect()
@@ -292,6 +299,24 @@ class BoardStore:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     return connection
+
+  def _mutate_board(
+    self,
+    username: str,
+    mutator: Callable[[sqlite3.Connection, int], None],
+  ) -> dict[str, object]:
+    connection = self._connect()
+    try:
+      board_id = self._ensure_board(connection, username)
+      mutator(connection, board_id)
+      self._touch_board(connection, board_id)
+      connection.commit()
+      return self._load_board(connection, board_id)
+    except Exception:
+      connection.rollback()
+      raise
+    finally:
+      connection.close()
 
   def _ensure_board(self, connection: sqlite3.Connection, username: str) -> int:
     user_row = connection.execute(
@@ -385,6 +410,114 @@ class BoardStore:
       (board_id, column_id),
     ).fetchall()
     return [row["card_id"] for row in rows]
+
+  def _rename_column_for_board(
+    self,
+    connection: sqlite3.Connection,
+    board_id: int,
+    column_id: str,
+    title: str,
+  ) -> None:
+    updated = connection.execute(
+      "UPDATE columns SET title = ? WHERE board_id = ? AND column_id = ?",
+      (title, board_id, column_id),
+    )
+    if updated.rowcount == 0:
+      raise ColumnNotFoundError("Column not found")
+
+  def _add_card_for_board(
+    self,
+    connection: sqlite3.Connection,
+    board_id: int,
+    column_id: str,
+    title: str,
+    details: str,
+  ) -> None:
+    self._require_column(connection, board_id, column_id)
+    next_order = connection.execute(
+      "SELECT COALESCE(MAX(sort_order) + 1, 0) FROM cards WHERE board_id = ? AND column_id = ?",
+      (board_id, column_id),
+    ).fetchone()[0]
+    card_id = self._generate_card_id()
+    connection.execute(
+      "INSERT INTO cards (board_id, card_id, column_id, title, details, sort_order) VALUES (?, ?, ?, ?, ?, ?)",
+      (board_id, card_id, column_id, title, details, next_order),
+    )
+
+  def _update_card_for_board(
+    self,
+    connection: sqlite3.Connection,
+    board_id: int,
+    card_id: str,
+    title: str,
+    details: str,
+  ) -> None:
+    updated = connection.execute(
+      "UPDATE cards SET title = ?, details = ? WHERE board_id = ? AND card_id = ?",
+      (title, details, board_id, card_id),
+    )
+    if updated.rowcount == 0:
+      raise CardNotFoundError("Card not found")
+
+  def _delete_card_for_board(
+    self,
+    connection: sqlite3.Connection,
+    board_id: int,
+    card_id: str,
+    expected_column_id: str | None = None,
+  ) -> None:
+    card_row = self._require_card(connection, board_id, card_id)
+    column_id = card_row["column_id"]
+    if expected_column_id is not None and column_id != expected_column_id:
+      raise CardNotFoundError("Card not found in column")
+
+    remaining_ids = self._get_ordered_card_ids(connection, board_id, column_id)
+    remaining_ids.remove(card_id)
+    connection.execute(
+      "DELETE FROM cards WHERE board_id = ? AND card_id = ?",
+      (board_id, card_id),
+    )
+    self._rewrite_column_order(connection, board_id, column_id, remaining_ids)
+
+  def _move_card_for_board(
+    self,
+    connection: sqlite3.Connection,
+    board_id: int,
+    card_id: str,
+    target_column_id: str,
+    position: int,
+  ) -> None:
+    self._require_column(connection, board_id, target_column_id)
+    card_row = self._require_card(connection, board_id, card_id)
+    source_column_id = card_row["column_id"]
+
+    if position < 0:
+      raise BoardValidationError("Position must be zero or greater")
+
+    if source_column_id == target_column_id:
+      ordered_ids = self._get_ordered_card_ids(connection, board_id, source_column_id)
+      ordered_ids.remove(card_id)
+      if position > len(ordered_ids):
+        raise BoardValidationError("Position is out of range")
+      ordered_ids.insert(position, card_id)
+      self._rewrite_column_order(connection, board_id, source_column_id, ordered_ids)
+      return
+
+    source_ids = self._get_ordered_card_ids(connection, board_id, source_column_id)
+    source_ids.remove(card_id)
+    target_ids = self._get_ordered_card_ids(connection, board_id, target_column_id)
+    if position > len(target_ids):
+      raise BoardValidationError("Position is out of range")
+
+    self._prepare_column_for_reorder(connection, board_id, source_column_id)
+    self._prepare_column_for_reorder(connection, board_id, target_column_id)
+    connection.execute(
+      "UPDATE cards SET column_id = ?, sort_order = ? WHERE board_id = ? AND card_id = ?",
+      (target_column_id, 2_000_000, board_id, card_id),
+    )
+    target_ids.insert(position, card_id)
+    self._apply_column_order(connection, board_id, source_column_id, source_ids)
+    self._apply_column_order(connection, board_id, target_column_id, target_ids)
 
   def _require_column(
     self,

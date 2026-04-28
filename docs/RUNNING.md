@@ -9,6 +9,7 @@ The current app runs as a single Docker container and serves:
 - Health endpoint at `http://localhost:8000/api/health`
 - Board API routes documented in `docs/BOARD_API.md`
 - AI probe route at `POST http://localhost:8000/api/ai/probe`
+- AI chat route at `POST http://localhost:8000/api/ai/chat`
 
 The Part 4 login uses the fixed demo credentials below:
 
@@ -20,6 +21,9 @@ The Part 6 backend creates `db.sqlite3` automatically when the board API is firs
 The Part 8 AI probe route uses the fixed OpenRouter model `openai/gpt-oss-120b:free`.
 Set `OPENROUTER_API_KEY` before calling that route for a real response.
 If the key is missing, the backend returns a clear `503` error when the AI route is used.
+
+The Part 9 board-aware AI route is documented in `docs/AI_API.md`.
+It keeps chat history in backend memory for the current authenticated session and does not write that history to SQLite.
 
 ## Start and stop
 
