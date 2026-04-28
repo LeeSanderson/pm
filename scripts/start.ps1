@@ -14,6 +14,7 @@ function Assert-DockerAvailable {
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $imageName = "pm-mvp"
 $containerName = "pm-mvp"
+$envFilePath = Join-Path $repoRoot ".env"
 
 Assert-DockerAvailable
 
@@ -23,6 +24,21 @@ if ($existingContainer) {
 }
 
 docker build -t $imageName $repoRoot
-docker run --detach --name $containerName -p 8000:8000 $imageName | Out-Null
+
+$runArgs = @(
+  "run"
+  "--detach"
+  "--name"
+  $containerName
+  "-p"
+  "8000:8000"
+)
+
+if (Test-Path $envFilePath) {
+  $runArgs += @("--env-file", $envFilePath)
+}
+
+$runArgs += $imageName
+docker @runArgs | Out-Null
 
 Write-Host "App is starting at http://localhost:8000"

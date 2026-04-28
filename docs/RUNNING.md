@@ -50,6 +50,8 @@ Windows PowerShell:
 ./scripts/stop.ps1
 ```
 
+If a root `.env` file exists, the start script passes it into the container automatically.
+
 macOS and Linux:
 
 ```bash
@@ -61,8 +63,10 @@ macOS and Linux:
 
 ```bash
 docker build -t pm-mvp .
-docker run --rm -p 8000:8000 --name pm-mvp pm-mvp
+docker run --rm -p 8000:8000 --env-file .env --name pm-mvp pm-mvp
 ```
+
+If you omit `--env-file .env`, AI routes will return `OPENROUTER_API_KEY is not set`.
 
 ## Local test flow
 
