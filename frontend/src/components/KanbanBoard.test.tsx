@@ -1,7 +1,8 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { KanbanBoard } from "@/components/KanbanBoard";
-import { initialData, type BoardData } from "@/lib/kanban";
+import { type BoardData } from "@/lib/kanban";
+import { initialData } from "@/test/boardFixtures";
 
 const jsonResponse = (body: unknown, status = 200) =>
   ({

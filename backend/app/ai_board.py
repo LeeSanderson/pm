@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 from app.ai_client import AIResponseError
 
 MAX_CONVERSATION_MESSAGES = 12
+MAX_SESSIONS = 1000
 
 
 def _normalize_required_text(value: str, message: str) -> str:
@@ -29,7 +30,7 @@ class ConversationMessage(BaseModel):
 
 
 class AIChatRequest(BaseModel):
-  message: str
+  message: Annotated[str, Field(max_length=4_000)]
 
   @field_validator("message")
   @classmethod
@@ -115,14 +116,22 @@ class AIChatModelResponse(BaseModel):
 
 
 class ConversationStore:
-  def __init__(self, max_messages: int = MAX_CONVERSATION_MESSAGES):
+  def __init__(
+    self,
+    max_messages: int = MAX_CONVERSATION_MESSAGES,
+    max_sessions: int = MAX_SESSIONS,
+  ):
     self.max_messages = max_messages
+    self.max_sessions = max_sessions
     self._messages: dict[str, list[ConversationMessage]] = {}
 
   def get_messages(self, session_id: str) -> list[ConversationMessage]:
     return list(self._messages.get(session_id, []))
 
   def append_turn(self, session_id: str, user_message: str, assistant_message: str) -> None:
+    if session_id not in self._messages and len(self._messages) >= self.max_sessions:
+      oldest_key = next(iter(self._messages))
+      del self._messages[oldest_key]
     history = self._messages.setdefault(session_id, [])
     history.extend(
       [
@@ -174,8 +183,6 @@ def parse_ai_chat_response(raw_response: str) -> AIChatModelResponse:
     return AIChatModelResponse.model_validate_json(normalized)
   except ValidationError as error:
     raise AIResponseError("AI response did not match the required JSON contract") from error
-  except json.JSONDecodeError as error:
-    raise AIResponseError("AI response was not valid JSON") from error
 
 
 def serialize_operations(operations: Sequence[BoardOperation]) -> list[dict[str, object]]:

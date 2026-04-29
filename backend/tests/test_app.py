@@ -511,6 +511,30 @@ def test_update_card_requires_non_empty_title(tmp_path: Path) -> None:
   assert response.json() == {"detail": "Card title is required"}
 
 
+def test_update_card_allows_empty_details(tmp_path: Path) -> None:
+  client = create_authenticated_client(tmp_path, tmp_path / "db.sqlite3")
+
+  response = client.patch(
+    "/api/board/cards/card-1",
+    json={"title": "Align roadmap themes", "details": ""},
+  )
+
+  assert response.status_code == 200
+  assert response.json()["cards"]["card-1"]["details"] == ""
+
+
+def test_ai_chat_rejects_blank_message(tmp_path: Path) -> None:
+  client = create_authenticated_client(
+    tmp_path,
+    tmp_path / "db.sqlite3",
+    ai_client=DummyAIClient("{}"),
+  )
+
+  response = client.post("/api/ai/chat", json={"message": ""})
+
+  assert response.status_code == 422
+
+
 def test_test_reset_board_route_is_disabled_by_default(tmp_path: Path) -> None:
   client = create_client(tmp_path, tmp_path / "db.sqlite3")
 

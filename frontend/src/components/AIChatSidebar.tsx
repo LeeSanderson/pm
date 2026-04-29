@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { AIChatOperation } from "@/lib/boardApi";
 
 export type AIChatSubmitResult = {
   assistantMessage: string;
-  appliedOperations: Array<{ type: string }>;
+  appliedOperations: AIChatOperation[];
   model: string;
 };
 

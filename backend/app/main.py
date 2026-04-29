@@ -1,11 +1,13 @@
 import secrets
 import os
+import warnings
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.ai_board import (
@@ -47,17 +49,17 @@ class LoginRequest(BaseModel):
 
 
 class RenameColumnRequest(BaseModel):
-  title: str
+  title: Annotated[str, Field(max_length=255)]
 
 
 class CreateCardRequest(BaseModel):
-  title: str
-  details: str = ""
+  title: Annotated[str, Field(max_length=255)]
+  details: Annotated[str, Field(default="", max_length=10_000)]
 
 
 class UpdateCardRequest(BaseModel):
-  title: str
-  details: str
+  title: Annotated[str, Field(max_length=255)]
+  details: Annotated[str, Field(max_length=10_000)]
 
 
 class MoveCardRequest(BaseModel):
@@ -77,7 +79,14 @@ def resolve_frontend_dist_dir(frontend_dist_dir: Path | None = None) -> Path:
 
 
 def resolve_session_secret() -> str:
-  return os.environ.get("SESSION_SECRET", DEFAULT_SESSION_SECRET)
+  secret = os.environ.get("SESSION_SECRET")
+  if not secret:
+    warnings.warn(
+      "SESSION_SECRET is not set — using the default dev secret. Set SESSION_SECRET before deploying.",
+      stacklevel=2,
+    )
+    return DEFAULT_SESSION_SECRET
+  return secret
 
 
 def resolve_db_path(db_path: Path | None = None) -> Path:

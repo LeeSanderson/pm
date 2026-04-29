@@ -172,7 +172,7 @@ class BoardStore:
 
   def update_card(self, username: str, card_id: str, title: str, details: str) -> dict[str, object]:
     normalized_title = self._normalize_title(title, "Card title is required")
-    normalized_details = self._normalize_details(details)
+    normalized_details = details.strip()
     return self._mutate_board(
       username,
       lambda connection, board_id: self._update_card_for_board(
